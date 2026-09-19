@@ -24,6 +24,10 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
 
     Trials with no sessions in the first 3 days produce divide-by-zero shares;
     zero engagement is real information, so those become 0 rather than NaN.
+    Base aggregates are:
+    - sessions_day1, sessions_day2, sessions_day3
+    - listen_sessions_3d, total_minutes_3d
+    - country, device_type
     """
     df = df.copy()
     df["sessions_3d"] = df[DAY_COLUMNS].sum(axis=1)

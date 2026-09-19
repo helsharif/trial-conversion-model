@@ -22,6 +22,17 @@ def predict_proba(model: XGBClassifier, aggregates: pd.DataFrame) -> pd.Series:
     rarely carries every country and device, so the dummy columns are
     reindexed against the model's training columns; the categories the
     batch does not have become explicit zeros.
+
+    Base aggregates are:
+    - sessions_day1, sessions_day2, sessions_day3
+    - listen_sessions_3d, total_minutes_3d
+    - country, device_type
+
+    add_features() and reindexing will result in feature columns:
+    sessions_3d, active_days_3d, day1_share, 
+    listen_share, avg_session_minutes, total_minutes_3d,
+    country_EU,	country_India, country_Rest, country_US,
+    device_type_Android, device_type_Web, device_type_iOS
     """
     df = add_features(aggregates)
     rows = pd.get_dummies(df[FEATURES], columns=CATEGORICAL)
