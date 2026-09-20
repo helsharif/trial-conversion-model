@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+# updated from python 3.11 to 3.13
+FROM python:3.13-slim
 
 # xgboost needs the OpenMP runtime, which slim images do not ship
 RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
