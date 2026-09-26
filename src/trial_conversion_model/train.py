@@ -18,6 +18,8 @@ import mlflow
 import mlflow.data
 import mlflow.xgboost
 
+import boto3
+
 
 # import .env variables
 dotenv.load_dotenv()
@@ -96,4 +98,21 @@ def train(model_dir: Path = MODEL_DIR) -> dict:
             "features": list(X.columns),
         }
         (model_dir / "metrics.json").write_text(json.dumps(metrics, indent=2))
+
+        # Upload the model and metrics to S3 into the "models" folder of the bucket "futureproofds-trial-conversion-artifacts-bucket-001"
+        s3_bucket = "futureproofds-trial-conversion-artifacts-bucket-001"
+        s3_client = boto3.client("s3")
+        s3_client.upload_file( 
+            Filename = str(model_dir / "model.json"), 
+            Bucket = s3_bucket, 
+            Key = f"models/model.json"
+            )
+        s3_client.upload_file( 
+            Filename = str(model_dir / "metrics.json"),
+            Bucket = s3_bucket,
+            Key = f"models/metrics.json"
+            )
+        # print message that the model and metrics have been uploaded to S3
+        print(f"Model and metrics uploaded to S3 bucket '{s3_bucket}' in 'models/' folder.")
+
         return metrics
