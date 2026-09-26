@@ -31,7 +31,7 @@ RANDOM_STATE = 42
 
 # MODEL PARAMETERS
 PARAMS = {
-    "n_estimators": 400,
+    "n_estimators": 500,
     "max_depth": 3,
     "learning_rate": 0.01,
     "min_child_weight": 8,
