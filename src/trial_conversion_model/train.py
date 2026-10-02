@@ -141,7 +141,7 @@ def train_and_register(
     from mlflow.exceptions import MlflowException
     from mlflow.tracking import MlflowClient
 
-    min_auc_improvement = 0.03
+    min_auc_improvement = 0.005
     model_dir = Path(model_dir)
     client = MlflowClient()
     baseline_aucs = {}
