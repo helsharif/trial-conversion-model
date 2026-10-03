@@ -31,6 +31,7 @@ def health() -> dict:
 @router.post("/predict", response_model=PredictionResponse)
 def predict(request: PredictionRequest) -> PredictionResponse:
     """Predict conversion probability for a single live trial."""
+    row = pd.DataFrame([request.model_dump()]) # turn request into one-row table (DataFrame) your prediction function expects.
     conv_prob = round(float(predict_proba(model, row).iloc[0]), 4) # Step 2: Score and round to 4 decimals
     conv_band = to_band(conv_prob) # Step 3: Convert probability to band
     return PredictionResponse(
