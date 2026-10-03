@@ -1,4 +1,5 @@
 import logging
+from importlib.metadata import version
 
 import pandas as pd
 from fastapi import APIRouter
@@ -25,7 +26,7 @@ def to_band(probability: float) -> str:
 
 @router.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    return {"status": "ok", "version": version("trial-conversion-model")}
 
 
 @router.post("/predict", response_model=PredictionResponse)
