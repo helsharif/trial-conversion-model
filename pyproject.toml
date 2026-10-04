@@ -1,6 +1,6 @@
 [project]
 name = "trial-conversion-model"
-version = "0.2.0"
+version = "0.3.0"
 description = "Predicts, from a trial's first 3 days of behavior, whether it will convert to a paid plan"
 readme = "README.md"
 authors = [
