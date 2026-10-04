@@ -1,0 +1,107 @@
+# Three values in this file are yours, not mine. Replace every one of the
+# placeholders written as <like-this> before your first push, or the run
+# will fail on the first step that needs them.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run ruff check .
+
+      # The model artifact is not in git, and your API loads the model the
+      # moment it is imported, so anything that imports your service needs
+      # that file to already be on disk. Add a step that downloads
+      # models/model.json from your bucket, and put it where it has to go.
+
+      - name: Pull the published model from S3 (for testing)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-2
+        run: >
+          uv run --with boto3 python -c "import boto3;
+          boto3.client('s3').download_file(
+          'futureproofds-trial-conversion-artifacts-bucket-001',
+          'models/model.json', 'models/model.json')"
+
+
+      - name: Test
+        run: uv run pytest
+
+      - name: Build the service image
+        run: docker build -t trial-conversion-model:${{ github.sha }} .
+
+  publish:
+    needs: ci
+    # every push runs the job above, but only one branch should ever
+    # publish an image. Add the condition that limits this job to main.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Pull the published model from S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-2
+        run: >
+          uv run --with boto3 python -c "import boto3;
+          boto3.client('s3').download_file(
+          'futureproofds-trial-conversion-artifacts-bucket-001',
+          'models/model.json', 'models/model.json')"
+
+      # The registry is where CI hands the image to the server. The
+      # GITHUB_TOKEN authenticates the push; no extra secrets needed.
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push the image
+        run: |
+          IMAGE=ghcr.io/helsharif/trial-conversion-model
+          docker build -t $IMAGE:latest -t $IMAGE:${{ github.sha }} .
+          docker push $IMAGE:latest
+          docker push $IMAGE:${{ github.sha }}
+
+  deploy:
+    needs: publish
+    # same condition as the publish job. Deploying is the one thing
+    # that must never happen from a branch (other than main).
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      # The same three commands a human runs for a manual deploy,
+      # executed by GitHub over SSH on every push to main.
+      - name: Restart the service on EC2 with the new image
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            sudo docker pull ghcr.io/helsharif/trial-conversion-model:latest
+            sudo docker rm -f trial-conversion || true
+            sudo docker run -d --restart unless-stopped --name trial-conversion -p 8000:8000 ghcr.io/helsharif/trial-conversion-model:latest
