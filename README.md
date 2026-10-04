@@ -121,13 +121,13 @@ Before training, it finds the existing AUC from these sources:
 
 If both sources exist, the higher AUC is the baseline. If neither contains an existing model, the first candidate is promoted automatically. S3 is an upload destination, not a baseline lookup source. An incomplete local model/metrics pair, invalid or missing incumbent AUC, or registry service error stops the workflow rather than treating the candidate as the first model.
 
-Promotion requires an **absolute AUC improvement of at least `0.03`**:
+Promotion requires an **absolute AUC improvement of at least `0.005`**:
 
 ```text
-candidate_test_auc - previous_auc >= 0.03
+candidate_test_auc - previous_auc >= 0.005
 ```
 
-For example, a baseline of `0.80` requires a candidate AUC of `0.83` or higher. The comparison retains full precision and allows only a `1e-12` absolute tolerance for floating-point noise at the boundary. Local metrics produced by the original `train()` remain rounded to four decimal places and are read as stored.
+For example, a baseline of `0.80` requires a candidate AUC of `0.805` or higher. The comparison retains full precision and allows only a `1e-12` absolute tolerance for floating-point noise at the boundary. Local metrics produced by the original `train()` remain rounded to four decimal places and are read as stored.
 
 | Outcome | Actions |
 | --- | --- |
@@ -138,7 +138,7 @@ The MLflow run records `min_auc_improvement`, plus `previous_auc` and `auc_impro
 
 Promoted `metrics.json` files contain full-precision `test_auc`, `previous_auc`, `auc_improvement`, `min_auc_improvement`, `n_train`, `n_test`, `features`, `run_id`, `promoted`, `registered_model_name`, and `model_version`. The first promotion has `null` for the previous AUC and improvement. The default local filenames and S3 keys are the same as those in the table above.
 
-Python callers can override `model_dir`, `registered_model_name`, and `s3_bucket`. The thin script uses the defaults; the threshold is fixed at `0.03` inside the function. A custom `model_dir` changes only local storage, while S3 keys remain `models/model.json` and `models/metrics.json`.
+Python callers can override `model_dir`, `registered_model_name`, and `s3_bucket`. The thin script uses the defaults; the threshold is fixed at `0.005` inside the function. A custom `model_dir` changes only local storage, while S3 keys remain `models/model.json` and `models/metrics.json`.
 
 Use comparable evaluation data across runs: this workflow compares historical AUC values and does not re-evaluate the incumbent on the candidate's test set or enforce matching data versions. Run promotions serially. MLflow, local files, and S3 are not updated in a single transaction. Upload failures preserve the local champion and registry alias, but may leave a registered candidate and one updated S3 object. Later failures can also leave local artifacts or the alias out of sync. Inspect and reconcile those states before retrying; a retry may use a changed baseline.
 

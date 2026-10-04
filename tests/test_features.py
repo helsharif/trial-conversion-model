@@ -19,6 +19,7 @@ def test_zero_session_trial_gets_zero_shares_not_nan():
     #   2. Pass it through add_features.
     #   3. Assert that day1_share, listen_share and avg_session_minutes each
     #      come back as 0 rather than a missing value.
+    aggregates = pd.DataFrame([TRIAL_NO_SESSIONS])
     df = add_features(aggregates)
 
     # Verify zero-session features are 0 instead of NaN.

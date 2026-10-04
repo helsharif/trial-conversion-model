@@ -54,8 +54,8 @@ def registered_incumbent(workflow, auc, alias=True):
 
 
 @pytest.mark.parametrize("previous_auc,promoted", [
-    (None, True), (0.80, True), (0.79, True), (0.800001, False),
-    (0.82, False), (0.83, False), (0.90, False),
+    (None, True), (0.825, True), (0.82, True), (0.825001, False),
+    (0.826, False), (0.83, False), (0.90, False),
 ])
 def test_local_promotion_gate(workflow, tmp_path, previous_auc, promoted):
     if previous_auc is not None:
@@ -86,7 +86,7 @@ def test_local_promotion_gate(workflow, tmp_path, previous_auc, promoted):
 
 
 @pytest.mark.parametrize("alias", [True, False])
-@pytest.mark.parametrize("auc,promoted", [(0.80, True), (0.81, False)])
+@pytest.mark.parametrize("auc,promoted", [(0.825, True), (0.826, False)])
 def test_registered_baseline(workflow, tmp_path, alias, auc, promoted):
     registered_incumbent(workflow, auc, alias)
     result = workflow.training.train_and_register(tmp_path)
@@ -94,7 +94,7 @@ def test_registered_baseline(workflow, tmp_path, alias, auc, promoted):
     assert result["promoted"] is promoted
 
 
-@pytest.mark.parametrize("local,remote", [(0.82, 0.78), (0.78, 0.82)])
+@pytest.mark.parametrize("local,remote", [(0.826, 0.82), (0.82, 0.826)])
 def test_stronger_baseline_wins(workflow, tmp_path, local, remote):
     save_incumbent(tmp_path, local)
     registered_incumbent(workflow, remote)

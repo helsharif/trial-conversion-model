@@ -1,11 +1,10 @@
+import datetime
 import os
 from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-
-import datetime
 
 RAW_DATA = Path("data/01_raw/trial_snapshot.csv")
 PROCESSED_DATA = Path("data/03_processed/training_data.csv")
@@ -47,7 +46,7 @@ def load_processed(path: Path = PROCESSED_DATA) -> pd.DataFrame:
 
 def data_version(path: Path = PROCESSED_DATA) -> str:
     """Return the file creation timestamp or the last modified timestamp (whichever is later) of the processed training table.
-    timestamp formatted as a string in the format YYYY-MM-DD-HH_MM_SS. This can be used to track the version of the training data used for model training."""
+    timestamp formatted in UTC as a string in the format YYYY-MM-DD-HH_MM_SS. This can be used to track the version of the training data used for model training."""
     if not path.exists():
         raise FileNotFoundError(f"{path} does not exist")
 
@@ -61,7 +60,7 @@ def data_version(path: Path = PROCESSED_DATA) -> str:
     latest_epoch = max(birth_time, stat.st_mtime)
 
     # 2. Convert the float timestamp to a datetime object
-    dt = datetime.datetime.fromtimestamp(latest_epoch)
+    dt = datetime.datetime.fromtimestamp(latest_epoch, tz=datetime.UTC)
 
     # 3. Format into the requested YYYY-MM-DD-HH_MM_SS string
     return dt.strftime("%Y-%m-%d-%H_%M_%S")

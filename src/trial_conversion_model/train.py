@@ -1,25 +1,19 @@
 import json
 from pathlib import Path
-import pandas as pd
 
+import boto3
+import dotenv
+import mlflow
+import mlflow.data
+import mlflow.xgboost
+import pandas as pd
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
 #from xgboost import XGBClassifier
-
-from trial_conversion_model.data import load_processed
-from trial_conversion_model.data import data_version
+from trial_conversion_model.data import data_version, load_processed
 from trial_conversion_model.features import TARGET
-
-import dotenv
-
-import mlflow
-import mlflow.data
-import mlflow.xgboost
-
-import boto3
-
 
 # import .env variables
 dotenv.load_dotenv()
@@ -105,12 +99,12 @@ def train(model_dir: Path = MODEL_DIR) -> dict:
         s3_client.upload_file( 
             Filename = str(model_dir / "model.json"), 
             Bucket = s3_bucket, 
-            Key = f"models/model.json"
+            Key = "models/model.json"
             )
         s3_client.upload_file( 
             Filename = str(model_dir / "metrics.json"),
             Bucket = s3_bucket,
-            Key = f"models/metrics.json"
+            Key = "models/metrics.json"
             )
         # print message that the model and metrics have been uploaded to S3
         print(f"Model and metrics uploaded to S3 bucket '{s3_bucket}' in 'models/' folder.")
@@ -123,7 +117,7 @@ def train_and_register(
     registered_model_name: str = "trial_conversion_model",
     s3_bucket: str = "futureproofds-trial-conversion-artifacts-bucket-001",
 ) -> dict:
-    """Promote a candidate only when its test AUC improves by at least 0.03.
+    """Promote a candidate only when its test AUC improves by at least 0.005.
 
     Compare with saved metrics and the registry's champion (or latest version
     when no champion alias exists), using the higher AUC if both exist. The

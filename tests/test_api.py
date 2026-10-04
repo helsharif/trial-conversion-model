@@ -53,7 +53,6 @@ def test_predict_rejects_a_request_missing_a_field():
     # schema declares the field required, so this test is what notices if
     # that ever quietly changes.
     response = client.post("/predict", json=TRIAL_MISSING_FIELD)
-    body = response.json()
     assert response.status_code == 422, f"Expected 422 Unprocessable Entity, but instead got {response.status_code}"
 
 def test_valid_trial_retuns_expected_response_structure():
