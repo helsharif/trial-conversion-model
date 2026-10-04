@@ -103,5 +103,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             sudo docker pull ghcr.io/helsharif/trial-conversion-model:latest
+            sudo docker stop trial-conversion 2>/dev/null || true
             sudo docker rm -f trial-conversion || true
+            sleep 2
             sudo docker run -d --restart unless-stopped --name trial-conversion -p 8000:8000 ghcr.io/helsharif/trial-conversion-model:latest
