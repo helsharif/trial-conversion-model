@@ -167,11 +167,30 @@ docker build -t trial-conversion-model .
 docker run -p 8000:8000 trial-conversion-model
 ```
 
-`POST /predict` takes one trial's first-3-day base aggregates and returns its conversion probability plus a low/medium/high band; `GET /health` reports service status. Interactive docs live at `/docs` while the service runs.
+The model loads once when the API module is imported at startup. Restart the service after replacing the local model to serve the updated artifact.
+
+| Endpoint | Behavior |
+| --- | --- |
+| `POST /predict` | Scores one trial's first-3-day base aggregates, records the request and prediction, and returns `conv_prob` and `conv_band`. |
+| `GET /health` | Returns `status: "ok"` and `version`, the installed `trial-conversion-model` package version. |
+| `GET /prediction-logs` | Displays recorded predictions as an HTML table, newest first. |
+| `GET /docs` | Opens the interactive API documentation. |
+
+`conv_prob` is rounded to four decimal places before assigning `conv_band`: **low** for values below `0.33`, **medium** for values from `0.33` up to but excluding `0.66`, and **high** for values of `0.66` or above. All seven request fields shown below are required; session counts and total minutes must be nonnegative.
+
+### Prediction logging
+
+`main.py` creates `logs/` relative to the service's working directory and configures INFO-level console logging with timestamps. Each successful prediction produces a readable console message and appends one JSON record to `logs/predictions.jsonl`. The dedicated prediction logger writes only the JSON message to the file and does not propagate it to the console logger.
+
+Each record contains a Unix timestamp in seconds, the validated request fields nested under `request`, and the returned `conv_prob` and `conv_band`. Records accumulate across service restarts; the current implementation does not rotate or truncate the file.
+
+Open [prediction logs](http://127.0.0.1:8000/prediction-logs) while running locally, or use the same path on the deployed host. The page shows the total number of records, timestamps formatted as `YYYY-MM-DD HH:MM:SS` from Unix time (UTC), each request feature in its own column, and the probability and band in the final two columns. Floating-point values display with four decimal places. An empty or missing file displays `No prediction logs found.` The page reads the entire file on each visit; refresh it to see new predictions.
+
+Container logs are written inside the container. Mount persistent storage at the container's working-directory `logs/` path if records must survive container replacement. The log viewer exposes the recorded request features and predictions, and these routes do not implement authentication.
 
 ### Checking it works
 
-With the service running, three requests and what each should come back with.
+With the service running, try these three requests. The probabilities below illustrate the response format; actual values depend on the loaded model. Successful requests also appear in the prediction log viewer.
 
 A steady trial, spread across the first three days:
 
@@ -184,7 +203,7 @@ curl -s -X POST localhost:8000/predict -H "Content-Type: application/json" -d '{
 ```
 
 ```
-{"conversion_probability":0.8593,"conversion_band":"high"}
+{"conv_prob":0.8593,"conv_band":"high"}
 ```
 
 The same trial's activity crammed into day one:
@@ -198,11 +217,10 @@ curl -s -X POST localhost:8000/predict -H "Content-Type: application/json" -d '{
 ```
 
 ```
-{"conversion_probability":0.3385,"conversion_band":"medium"}
+{"conv_prob":0.3385,"conv_band":"medium"}
 ```
 
-A request with `sessions_day1` missing, which the contract turns down before any
-of your code runs:
+A request with `sessions_day1` missing is rejected by request validation before the prediction handler runs, so it does not create a prediction record:
 
 ```
 curl -i -s -X POST localhost:8000/predict -H "Content-Type: application/json" -d '{
@@ -226,3 +244,4 @@ HTTP/1.1 422 Unprocessable Entity
 - `data/02_interim/`: reserved for intermediate outputs in multi-step pipelines; this project goes straight from raw to processed, so it stays empty.
 - `data/03_processed/`: the model-ready training table written by the pipeline (never committed).
 - `models/`: local model and metrics files, also uploaded to S3 during training (not committed).
+- `logs/predictions.jsonl`: append-only records of successful API predictions, displayed by `GET /prediction-logs`.
