@@ -30,3 +30,6 @@ mlartifacts/
 
 # logs are ignored
 logs/
+
+# ignore monitoring
+monitoring/
