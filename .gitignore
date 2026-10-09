@@ -27,3 +27,6 @@ mlartifacts/
 
 # ssh credentials for aws
 .ssh/
+
+# logs are ignored
+logs/
