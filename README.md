@@ -27,6 +27,7 @@ The `.env.example` template also includes these settings. Fill them in alongside
 | `MLFLOW_TRACKING_URI` | Tracking server address; the template uses `http://127.0.0.1:5001`. |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Credentials used by boto3 for S3 access. Temporary credentials also require `AWS_SESSION_TOKEN`. |
 | `AWS_DEFAULT_REGION` | AWS region used by boto3. |
+| `S3_BUCKET` | Existing destination bucket for drift-monitoring reports; monitoring requires upload permission under `monitoring/`. Training uses its separate bucket configuration described below. |
 
 Keep credentials in the ignored `.env` file or use boto3's standard AWS credential providers. The training module loads `.env` when imported.
 
@@ -234,10 +235,57 @@ curl -i -s -X POST localhost:8000/predict -H "Content-Type: application/json" -d
 HTTP/1.1 422 Unprocessable Entity
 ```
 
+## Drift monitoring
+
+Input drift means the distribution of incoming trial features has changed relative to the training data. Since conversion outcomes arrive at the end of day 14, monitoring the first-three-day features provides an early signal while labels are still at least 11 days away. The check runs independently of training and serving; it does not need a trained model or an MLflow server.
+
+`scripts/check_drift.py` compares each selected cohort with the reference CSV at `data/01_raw/trial_snapshot.csv`. Keep this snapshot aligned with the extract used for training. Current cohorts are downloaded as Parquet files from the public S3 location `s3://fpds-trial-cohorts/cohorts/` and cached in `data/01_raw/cohorts/`. Downloads use unsigned requests in `eu-north-1`.
+
+### Run a check
+
+Run commands from the repository root after `uv sync`, which includes the development dependency Evidently. The reference snapshot must exist; use the setup instructions to fetch it if needed. Set `S3_BUCKET` in `.env` to the existing report destination bucket and configure AWS credentials with permission to upload under `monitoring/`. `publish_report()` loads `.env` before publishing. Public cohort downloads do not require credentials, but report uploads do.
+
+To check both the oldest and newest available cohorts against the reference:
+
+```bash
+uv run scripts/check_drift.py
+```
+
+Oldest and newest refer to S3 `LastModified` timestamps, not dates in filenames. Each is compared separately with the training snapshot, not with the other cohort.
+
+To check one cohort, pass its exact filename under the cohort prefix:
+
+```bash
+uv run scripts/check_drift.py cohort_2026-10-09.parquet
+```
+
+The source bucket, prefix, reference path, and local download directory are constants in `scripts/check_drift.py`. The script prints the cohort filename, the percentage of features that drifted, and an `OK` or `DRIFT` verdict after publishing successfully.
+
+### What is measured
+
+`src/trial_conversion_model/monitoring.py` applies the same `add_features()` transformation to both datasets, then selects the eight columns in `FEATURES`: `sessions_3d`, `active_days_3d`, `day1_share`, `listen_share`, `avg_session_minutes`, `total_minutes_3d`, `country`, and `device_type`. These are compared before one-hot encoding; conversion labels and predictions are excluded. Cohorts must contain the seven base input fields shown in the prediction examples above.
+
+Evidently's `DataDriftPreset` evaluates feature distributions using its default per-column drift settings. `drifted_share` is the fraction of feature columns flagged as drifted, not the fraction of trials affected. The dataset verdict is **`DRIFT` when `drifted_share >= 0.5`** (at least four of the current eight features), otherwise `OK`. This threshold is set by `DRIFT_SHARE` in the monitoring module.
+
+### Reports and interpretation
+
+For each cohort, the filename without `.parquet` becomes the report name:
+
+| Local output | S3 destination | Contents |
+| --- | --- | --- |
+| `monitoring/<cohort-name>.html` | `s3://<S3_BUCKET>/monitoring/<cohort-name>.html` | Evidently report for inspecting feature distributions and drift results. |
+| `monitoring/<cohort-name>.json` | `s3://<S3_BUCKET>/monitoring/<cohort-name>.json` | Compact summary containing `name`, `drifted_share`, and the Boolean `drift`; not the full Evidently report. |
+
+Re-running a cohort replaces its local reports and writes to the same S3 keys. Publishing is mandatory in the CLI: there is no local-only option. Local reports are written before uploads, so an upload failure may leave local reports and a partially uploaded pair of S3 objects. Errors propagate to the caller. A `DRIFT` verdict itself does not cause a nonzero exit status.
+
+Use the HTML report to identify which features changed and investigate data quality, acquisition mix, or engagement changes. Input drift is an investigation signal, not proof that prediction quality has fallen; confirm model performance once conversion labels are available. An `OK` verdict can still include individual drifted features below the dataset threshold. The script does not schedule checks, send alerts, retrain, or promote a model automatically.
+
 ## Layout
 
 - `src/trial_conversion_model/`: the package. `data.py` acquires the extract from the database, loads the pipeline's inputs, and derives the data-version timestamp; `features.py` derives the model features from the snapshot's base aggregates and writes the processed training table; `train.py` trains, evaluates, logs the MLflow run, saves local artifacts, and uploads them to S3; `predict.py` scores trials from their base aggregates; `api/` is the FastAPI service (`main.py` builds the app, `routes.py` holds the endpoints, `schemas.py` defines the request and response shapes).
 - `scripts/`: thin entry points that call into the package. `fetch_data.py` materializes the extract, `build.py` builds the training table, `train.py` trains from that table, `train_and_register.py` runs training with conditional champion promotion, `build_and_train.py` combines building and unconditional training, and `check_s3.py` checks bucket access. The logic stays importable and testable in `src/`.
+- `src/trial_conversion_model/monitoring.py`: prepares reference and cohort features, runs Evidently drift checks, and publishes HTML reports and JSON summaries locally and to S3.
+- `scripts/check_drift.py`: checks a named cohort, or the oldest and newest cohorts, against the training snapshot.
 - `tests/`: automated checks for the champion promotion workflow with mocked external services.
 - `notebooks/`: exploration only. Notebooks import from the package; no pipeline logic lives here.
 - `data/01_raw/`: the raw extract as pulled from the database (not committed; replaced when fetched again).
@@ -245,3 +293,5 @@ HTTP/1.1 422 Unprocessable Entity
 - `data/03_processed/`: the model-ready training table written by the pipeline (never committed).
 - `models/`: local model and metrics files, also uploaded to S3 during training (not committed).
 - `logs/predictions.jsonl`: append-only records of successful API predictions, displayed by `GET /prediction-logs`.
+- `data/01_raw/cohorts/`: downloaded Parquet cohorts used for drift checks.
+- `monitoring/`: HTML drift reports and compact JSON verdicts, also uploaded to the configured report bucket.
