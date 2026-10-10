@@ -32,7 +32,9 @@ def pull_specific_cohort_from_s3_by_name(bucket: str, prefix: str, local_dir: Pa
     The local directory is created if it does not exist. The cohort is
     determined by its name, not by timestamp.
     """
-    s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
+    s3 = boto3.client(
+        "s3", region_name="eu-north-1", config=Config(signature_version=UNSIGNED)
+    )
     local_dir.mkdir(parents=True, exist_ok=True)
     objects = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
     if "Contents" not in objects:
@@ -54,7 +56,9 @@ def pull_newest_cohort_from_s3(bucket: str, prefix: str, local_dir: Path) -> Pat
     The local directory is created if it does not exist. The latest file is
     determined by the last modified timestamp, not by name.
     """
-    s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
+    s3 = boto3.client(
+        "s3", region_name="eu-north-1", config=Config(signature_version=UNSIGNED)
+    )
     local_dir.mkdir(parents=True, exist_ok=True)
     objects = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
     if "Contents" not in objects:
@@ -70,7 +74,9 @@ def pull_oldest_cohort_from_s3(bucket: str, prefix: str, local_dir: Path) -> Pat
     The local directory is created if it does not exist. The oldest file is
     determined by the last modified timestamp, not by name.
     """
-    s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
+    s3 = boto3.client(
+        "s3", region_name="eu-north-1", config=Config(signature_version=UNSIGNED)
+    )
     local_dir.mkdir(parents=True, exist_ok=True)
     objects = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
     if "Contents" not in objects:
