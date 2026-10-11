@@ -1,10 +1,9 @@
 import logging
+import os  # for creating log directory
 
 from fastapi import FastAPI
 
 from trial_conversion_model.api.routes import router
-
-import os # for creating log directory
 
 # create a logs directory if it doesn't exist
 log_dir = "logs"

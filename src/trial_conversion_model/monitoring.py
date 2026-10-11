@@ -3,17 +3,15 @@ import os
 from pathlib import Path
 
 import boto3
+import pandas as pd
 from botocore import UNSIGNED
 from botocore.config import Config
-
-import pandas as pd
 from dotenv import load_dotenv
-
-from trial_conversion_model.data import RAW_DATA
-from trial_conversion_model.features import CATEGORICAL, FEATURES, add_features
-
 from evidently import Report
 from evidently.presets import DataDriftPreset
+
+from trial_conversion_model.data import RAW_DATA
+from trial_conversion_model.features import FEATURES, add_features
 
 REPORT_DIR = Path("monitoring")
 

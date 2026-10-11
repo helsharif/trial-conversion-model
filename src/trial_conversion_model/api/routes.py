@@ -1,6 +1,8 @@
 import json
 import logging
+import time  # for timestamps
 from importlib.metadata import version
+from pathlib import Path
 
 import pandas as pd
 from fastapi import APIRouter
@@ -8,11 +10,6 @@ from fastapi.responses import HTMLResponse
 
 from trial_conversion_model.api.schemas import PredictionRequest, PredictionResponse
 from trial_conversion_model.predict import load_model, predict_proba
-
-import time # for timestamps
-
-from pathlib import Path
-
 
 # Get the both the general console logger and jsonl prediction logger configured in main.py.
 logger = logging.getLogger(__name__)
