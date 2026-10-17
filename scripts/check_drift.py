@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 from trial_conversion_model.monitoring import (
+    alert,
     drifted_share,
     load_cohort,
     load_reference,
@@ -10,7 +11,6 @@ from trial_conversion_model.monitoring import (
     pull_oldest_cohort_from_s3,
     pull_specific_cohort_from_s3_by_name,
     run_drift_check,
-    alert,
 )
 
 REFERENCE_PATH = Path("data/01_raw/trial_snapshot.csv")
