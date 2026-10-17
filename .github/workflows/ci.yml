@@ -40,6 +40,9 @@ jobs:
       - name: Build the service image
         run: docker build -t trial-conversion-model:${{ github.sha }} .
 
+      - name: Build the jobs image
+        run: docker build -f Dockerfile.jobs -t trial-conversion-model-jobs:${{ github.sha }} .
+
   publish:
     needs: ci
     if: github.ref == 'refs/heads/main'
