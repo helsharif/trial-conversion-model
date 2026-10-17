@@ -74,7 +74,7 @@ jobs:
 
       - name: Build and push both images
         run: |
-          IMAGE=ghcr.io/<your-github-username>/trial-conversion-model
+          IMAGE=ghcr.io/helsharif/trial-conversion-model
           docker build -t $IMAGE:latest -t $IMAGE:${{ github.sha }} .
           docker push $IMAGE:latest
           docker push $IMAGE:${{ github.sha }}
