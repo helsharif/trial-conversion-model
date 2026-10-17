@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
 from trial_conversion_model.api.schemas import PredictionRequest, PredictionResponse
-from trial_conversion_model.predict import load_model, predict_proba
+from trial_conversion_model.predict import load_model, predict_proba, to_band
 
 # Get the both the general console logger and jsonl prediction logger configured in main.py.
 logger = logging.getLogger(__name__)
@@ -20,14 +20,6 @@ router = APIRouter()
 # Load the model once, when the service starts, not on every request.
 model = load_model()
 
-
-def to_band(probability: float) -> str:
-    """Turn a raw probability into a label a human can act on."""
-    if probability < 0.33:
-        return "low"
-    if probability < 0.66:
-        return "medium"
-    return "high"
 
 
 @router.get("/health")

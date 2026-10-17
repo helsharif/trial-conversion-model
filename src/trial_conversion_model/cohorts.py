@@ -13,22 +13,22 @@ COHORT_DIR = Path("data/01_raw/cohorts")
 
 
 def pull_newest_cohort() -> Path:
-    """Download the newest day-3 cohort file and return its local path.
-
-    Nothing depends on pulling every day: a catch-up run after missed
-    days simply gets the most recent file.
+    """Download the latest cohort file from S3 to a local directory.
+    
+    The local directory is created if it does not exist. The latest file is
+    determined by the last modified timestamp, not by name.
     """
     s3 = boto3.client(
         "s3", region_name="eu-north-1", config=Config(signature_version=UNSIGNED)
     )
-    listing = s3.list_objects_v2(Bucket=COHORT_BUCKET, Prefix=COHORT_PREFIX)
-    # TODO: Decide which file in the bucket is the newest. Look at how the
-    # cohort files are named and what that means for sorting them. Call the
-    # winner `key`.
     COHORT_DIR.mkdir(parents=True, exist_ok=True)
-    path = COHORT_DIR / Path(key).name
-    s3.download_file(COHORT_BUCKET, key, str(path))
-    return path
+    objects = s3.list_objects_v2(Bucket=COHORT_BUCKET, Prefix=COHORT_PREFIX)
+    if "Contents" not in objects:
+        raise ValueError(f"No objects found in {COHORT_BUCKET}/{COHORT_PREFIX}")
+    latest = max(objects["Contents"], key=lambda o: o["LastModified"])
+    local_path = COHORT_DIR / Path(latest["Key"]).name
+    s3.download_file(COHORT_BUCKET, latest["Key"], str(local_path))
+    return local_path
 
 
 def newest_local_cohort() -> Path:

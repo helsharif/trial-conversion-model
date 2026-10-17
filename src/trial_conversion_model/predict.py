@@ -38,3 +38,11 @@ def predict_proba(model: XGBClassifier, aggregates: pd.DataFrame) -> pd.Series:
     rows = pd.get_dummies(df[FEATURES], columns=CATEGORICAL)
     rows = rows.reindex(columns=model.get_booster().feature_names, fill_value=0)
     return pd.Series(model.predict_proba(rows)[:, 1], index=aggregates.index)
+
+def to_band(probability: float) -> str:
+    """Turn a raw probability into a label a human can act on."""
+    if probability < 0.33:
+        return "low"
+    if probability < 0.66:
+        return "medium"
+    return "high"
