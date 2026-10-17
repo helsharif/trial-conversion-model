@@ -22,22 +22,19 @@ jobs:
       - name: Lint
         run: uv run ruff check .
 
-      # The model artifact is not in git, and your API loads the model the
-      # moment it is imported, so anything that imports your service needs
-      # that file to already be on disk. Add a step that downloads
-      # models/model.json from your bucket, and put it where it has to go.
-
-      - name: Pull the published model from S3 (for testing)
+      # The model artifact is not in git; the service cannot exist without
+      # it. CI pulls the published model from S3, exactly like production
+      # will, BEFORE the tests run (the API loads the model at import).
+      - name: Pull the published model from S3
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-2
+          AWS_DEFAULT_REGION: <your-region>
         run: >
-          uv run --with boto3 python -c "import boto3;
+          uv run python -c "import boto3;
           boto3.client('s3').download_file(
-          'futureproofds-trial-conversion-artifacts-bucket-001',
+          '<your-bucket-name>',
           'models/model.json', 'models/model.json')"
-
 
       - name: Test
         run: uv run pytest
@@ -47,8 +44,6 @@ jobs:
 
   publish:
     needs: ci
-    # every push runs the job above, but only one branch should ever
-    # publish an image. Add the condition that limits this job to main.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -63,33 +58,35 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-2
+          AWS_DEFAULT_REGION: <your-region>
         run: >
           uv run --with boto3 python -c "import boto3;
           boto3.client('s3').download_file(
-          'futureproofds-trial-conversion-artifacts-bucket-001',
+          '<your-bucket-name>',
           'models/model.json', 'models/model.json')"
 
       # The registry is where CI hands the image to the server. The
-      # PERSONAL_ACCESS_TOKEN_GITHUB authenticates the push; no extra secrets needed.
+      # GITHUB_TOKEN authenticates the push; no extra secrets needed.
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.PERSONAL_ACCESS_TOKEN_GITHUB }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push the image
+      - name: Build and push both images
         run: |
-          IMAGE=ghcr.io/helsharif/trial-conversion-model
+          IMAGE=ghcr.io/<your-github-username>/trial-conversion-model
           docker build -t $IMAGE:latest -t $IMAGE:${{ github.sha }} .
           docker push $IMAGE:latest
           docker push $IMAGE:${{ github.sha }}
+          # The jobs image ships with every push, the same way the API's does.
+          docker build -f Dockerfile.jobs -t $IMAGE-jobs:latest -t $IMAGE-jobs:${{ github.sha }} .
+          docker push $IMAGE-jobs:latest
+          docker push $IMAGE-jobs:${{ github.sha }}
 
   deploy:
     needs: publish
-    # same condition as the publish job. Deploying is the one thing
-    # that must never happen from a branch (other than main).
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
@@ -102,8 +99,9 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            sudo docker pull ghcr.io/helsharif/trial-conversion-model:latest
-            sudo docker stop trial-conversion 2>/dev/null || true
+            # Cron starts a container from this image every morning, so the
+            # pull here is what puts a pushed change into tomorrow's run.
+            sudo docker pull ghcr.io/<your-github-username>/trial-conversion-model-jobs:latest
+            sudo docker pull ghcr.io/<your-github-username>/trial-conversion-model:latest
             sudo docker rm -f trial-conversion || true
-            sleep 2
-            sudo docker run -d --restart unless-stopped --name trial-conversion -p 8000:8000 ghcr.io/helsharif/trial-conversion-model:latest
+            sudo docker run -d --restart unless-stopped --name trial-conversion -p 8000:8000 ghcr.io/<your-github-username>/trial-conversion-model:latest

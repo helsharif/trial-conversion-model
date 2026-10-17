@@ -1,0 +1,34 @@
+# The image the two scheduled jobs run in. It is separate from the API's
+# image so the service stays lean.
+# It holds code and the model, never data: the data arrives from the
+# bucket at run time. Cron names the script to run.
+FROM python:3.11-slim
+
+# xgboost needs the OpenMP runtime, which slim images do not ship
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+# Dependencies first, so code changes do not re-install the world.
+# The dev group is where the drift library lives, so it comes along.
+COPY pyproject.toml uv.lock README.md ./
+RUN uv sync --frozen --no-install-project
+
+COPY src/ src/
+COPY scripts/ scripts/
+RUN uv sync --frozen
+
+# The model artifact ships inside the image; the scoring script loads it,
+# and the jobs never train
+COPY models/model.json models/model.json
+
+# On the server, cron starts a short-lived container per job:
+#   sudo docker run --rm --network host --env-file /home/ubuntu/.env -v /home/ubuntu/data:/app/data ghcr.io/<your-username>/trial-conversion-model-jobs:latest uv run --no-sync scripts/score.py
+# --env-file passes the settings (bucket, region, Slack webhook), never AWS keys.
+# -v keeps the files that must survive between the 06:30 and 06:45 runs.
+# --network host lets the container reach the instance role through the
+# server's own network; on the default bridge network IMDSv2's hop limit
+# of 1 blocks it.
