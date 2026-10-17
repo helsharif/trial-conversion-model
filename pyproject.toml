@@ -35,4 +35,5 @@ dev = [
     "nltk<3.10",
     "pytest>=9,<10",
     "ruff>=0.13.0",
+    "streamlit>=1.66.0",
 ]

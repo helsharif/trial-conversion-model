@@ -81,4 +81,10 @@ if __name__ == "__main__":
         print(f"Oldest cohort: {oldest_cohort_path.name} - Drifted share: {oldest_cohort_drifted_share:.2%} - Verdict: {verdict_oldest_cohort}")
         print(f"Newest cohort: {newest_cohort_path.name} - Drifted share: {newest_cohort_drifted_share:.2%} - Verdict: {verdict_newest_cohort}")
 
+        # if DRIFT is detected in newest cohort, send an alert to Slack
+        if verdict_newest_cohort == "DRIFT":
+            alert(
+                f"🚨 ALERT: Newest cohort *{newest_cohort_path.name}* has drifted! Please investigate. Drifted share: {newest_cohort_drifted_share:.2%}"
+            )
+
    
