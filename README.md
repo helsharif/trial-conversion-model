@@ -243,7 +243,7 @@ Input drift means the distribution of incoming trial features has changed relati
 
 ### Run a check
 
-Run commands from the repository root after `uv sync`, which includes the development dependency Evidently. The reference snapshot must exist; use the setup instructions to fetch it if needed. Set `S3_BUCKET` in `.env` to the existing report destination bucket and configure AWS credentials with permission to upload under `monitoring/`. `publish_report()` loads `.env` before publishing. Public cohort downloads do not require credentials, but report uploads do.
+Run commands from the repository root after `uv sync`, which includes the development dependency Evidently. If the reference snapshot is missing locally, `load_reference()` downloads `data/trial_snapshot.csv` from `S3_BUCKET` and caches it at `data/01_raw/trial_snapshot.csv`. Configure the AWS environment before starting the script so this download can authenticate; the scheduled container receives it through `--env-file`. Set `S3_BUCKET` in `.env` to the existing report destination bucket and configure AWS credentials with permission to upload under `monitoring/`. `publish_report()` loads `.env` before publishing. Public cohort downloads do not require credentials, but report uploads do.
 
 To check both the oldest and newest available cohorts against the reference:
 
@@ -278,14 +278,86 @@ For each cohort, the filename without `.parquet` becomes the report name:
 
 Re-running a cohort replaces its local reports and writes to the same S3 keys. Publishing is mandatory in the CLI: there is no local-only option. Local reports are written before uploads, so an upload failure may leave local reports and a partially uploaded pair of S3 objects. Errors propagate to the caller. A `DRIFT` verdict itself does not cause a nonzero exit status.
 
-Use the HTML report to identify which features changed and investigate data quality, acquisition mix, or engagement changes. Input drift is an investigation signal, not proof that prediction quality has fallen; confirm model performance once conversion labels are available. An `OK` verdict can still include individual drifted features below the dataset threshold. The script does not schedule checks, send alerts, retrain, or promote a model automatically.
+Use the HTML report to identify which features changed and investigate data quality, acquisition mix, or engagement changes. Input drift is an investigation signal, not proof that prediction quality has fallen; confirm model performance once conversion labels are available. An `OK` verdict can still include individual drifted features below the dataset threshold. Scheduling is handled by EC2 cron as described below. In the no-argument run, a `DRIFT` verdict for the newest cohort sends a Slack webhook request when `SLACK_WEBHOOK_URL` is set; otherwise the script prints that the webhook is not configured. The named-cohort branch does not send this alert. Neither branch retrains or promotes a model automatically.
+
+## Daily scoring and drift checks on EC2
+
+The EC2 host runs two daily cron jobs using the separate jobs image built from
+[Dockerfile.jobs](Dockerfile.jobs). The schedule recorded in
+`ec2_folder/crontab_entries.txt` is:
+
+```cron
+30 6 * * * sudo docker run --rm --network host --env-file /home/ubuntu/.env -v /home/ubuntu/data:/app/data ghcr.io/helsharif/trial-conversion-model-jobs:latest uv run --no-sync scripts/score.py >> /home/ubuntu/logs/cron.log 2>&1
+45 6 * * * sudo docker run --rm --network host --env-file /home/ubuntu/.env -v /home/ubuntu/data:/app/data ghcr.io/helsharif/trial-conversion-model-jobs:latest uv run --no-sync scripts/check_drift.py >> /home/ubuntu/logs/cron.log 2>&1
+```
+
+| Time (EC2 cron timezone) | Job | Result |
+| --- | --- | --- |
+| Daily at 06:30 | `scripts/score.py` | Downloads the newest public cohort by S3 modification time, scores it with the model packaged in the jobs image, ranks lowest conversion probability first, and uploads `predictions/scored_YYYY-MM-DD.csv` to `S3_BUCKET`. |
+| Daily at 06:45 | `scripts/check_drift.py` | Compares the oldest and newest public cohorts with the training reference, uploads HTML reports and JSON verdicts under `monitoring/`, and requests a Slack alert if the newest cohort has drifted and a webhook is configured. |
+
+These times follow the EC2 host's cron timezone; the entries do not specify a
+timezone override. Check `timedatectl` on the host before translating them to
+local time. The jobs are independent: the 15-minute spacing does not make the
+drift check conditional on successful scoring or prevent overlapping runs.
+
+### Host configuration and persisted outputs
+
+`ec2_folder/setup_ec2.py` prepares `/home/ubuntu/data` and `/home/ubuntu/logs`
+and uploads the adjacent local `.env` to `/home/ubuntu/.env` with permissions
+`600`, replacing an existing remote file. It accepts exactly `S3_BUCKET`,
+`AWS_DEFAULT_REGION`, and `SLACK_WEBHOOK_URL`; it does not upload AWS access keys
+or install the crontab. `ec2_folder/` is ignored by Git, so these local helper
+files are not included in a fresh clone; the complete cron entries are retained
+above for reference.
+
+The jobs use the EC2 instance's IAM role for AWS credentials. The role needs
+read access to `data/trial_snapshot.csv` in `S3_BUCKET` and write access under
+`predictions/` and `monitoring/`. The public cohort downloads use unsigned S3
+requests. Host networking allows the containers to reach the instance metadata
+service with the host's network configuration.
+
+The `/home/ubuntu/data:/app/data` mount preserves downloaded cohorts, the
+reference snapshot, and ranked CSVs between runs. A missing reference is fetched
+from S3 on the first drift check; subsequent checks reuse the cached snapshot.
+Keep it aligned with the training reference when models change. Local HTML/JSON
+reports are outside this mount and disappear when `--rm` removes the container;
+their uploaded S3 copies persist. Both jobs append stdout and stderr to
+`/home/ubuntu/logs/cron.log`, which requires the host log directory to exist.
+
+Docker must be installed, the cron user's `sudo docker` command must work without
+an interactive password, and the jobs image must be available to that Docker
+context. Pull an updated image when deploying a new `latest` build: `docker run`
+does not automatically refresh an already cached tag. The model ships inside
+the image; these scheduled jobs do not train it.
+
+### Inspect the schedule and daily results
+
+Run on EC2 as the user whose crontab holds these entries (normally `ubuntu`):
+
+```bash
+crontab -l
+systemctl status cron --no-pager
+timedatectl
+tail -n 100 /home/ubuntu/logs/cron.log
+ls -lt /home/ubuntu/data/04_predictions/
+```
+
+Use `crontab -e` to install or update the two entries while preserving any other
+jobs. Check the log for the scoring upload confirmation and drift verdicts, then
+confirm the dated artifacts in S3. A `DRIFT` verdict is a monitoring result, not
+a process failure. These checks describe how to verify execution; the presence
+of cron entries alone does not confirm that a particular run succeeded.
 
 ## Layout
 
 - `src/trial_conversion_model/`: the package. `data.py` acquires the extract from the database, loads the pipeline's inputs, and derives the data-version timestamp; `features.py` derives the model features from the snapshot's base aggregates and writes the processed training table; `train.py` trains, evaluates, logs the MLflow run, saves local artifacts, and uploads them to S3; `predict.py` scores trials from their base aggregates; `api/` is the FastAPI service (`main.py` builds the app, `routes.py` holds the endpoints, `schemas.py` defines the request and response shapes).
 - `scripts/`: thin entry points that call into the package. `fetch_data.py` materializes the extract, `build.py` builds the training table, `train.py` trains from that table, `train_and_register.py` runs training with conditional champion promotion, `build_and_train.py` combines building and unconditional training, and `check_s3.py` checks bucket access. The logic stays importable and testable in `src/`.
 - `src/trial_conversion_model/monitoring.py`: prepares reference and cohort features, runs Evidently drift checks, and publishes HTML reports and JSON summaries locally and to S3.
-- `scripts/check_drift.py`: checks a named cohort, or the oldest and newest cohorts, against the training snapshot.
+- `scripts/check_drift.py`: checks a named cohort, or the oldest and newest cohorts, against the training snapshot; the scheduled no-argument run can alert Slack for newest-cohort drift.
+- `scripts/score.py`: produces and uploads the daily ranked trial list.
+- `Dockerfile.jobs`: image for the two short-lived EC2 cron jobs, including the scoring model and drift dependencies.
+- `ec2_folder/`: ignored local EC2 setup helper and cron entries; see the daily EC2 schedule above.
 - `tests/`: automated checks for the champion promotion workflow with mocked external services.
 - `notebooks/`: exploration only. Notebooks import from the package; no pipeline logic lives here.
 - `data/01_raw/`: the raw extract as pulled from the database (not committed; replaced when fetched again).
