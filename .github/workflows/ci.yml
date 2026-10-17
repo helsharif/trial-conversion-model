@@ -1,3 +1,4 @@
+# note, the EC2 has to be running, and the Public IP4 address is the EC2_HOST environment variable that needs to be updated in Github
 name: CI
 
 on:
