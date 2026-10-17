@@ -2,6 +2,8 @@ import json
 import os
 from pathlib import Path
 
+import requests
+
 import boto3
 import pandas as pd
 from botocore import UNSIGNED
@@ -136,3 +138,11 @@ def publish_report(snapshot: object, name: str) -> dict:
     for path in (html_path, json_path):
         s3.upload_file(str(path), bucket, f"monitoring/{path.name}")
     return {"drifted_share": share, "drift": share >= DRIFT_SHARE}
+
+# function to send alert to Slack webhook
+def alert(message: str) -> None:
+    webhook = os.environ.get("SLACK_WEBHOOK_URL")
+    if not webhook:
+        print("SLACK_WEBHOOK_URL not set; alert printed only")
+        return
+    requests.post(webhook, json={"text": message}, timeout=10)
