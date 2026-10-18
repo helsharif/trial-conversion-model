@@ -4,6 +4,13 @@ backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f1f5f9"
 textColor = "#0f172a"
 font = "sans serif"
+headingFontSizes = ["32px", "24px", "20px", "18px", "16px", "14px"]
+headingFontWeights = [600, 600, 600, 600, 600, 600]
+baseRadius = "8px"
+showWidgetBorder = true
+dataframeHeaderBackgroundColor = "#e2e8f0"
+paddingTop = "1.5rem"
+paddingBottom = "2rem"
 
 [browser]
 gatherUsageStats = false
