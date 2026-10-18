@@ -9,6 +9,7 @@ Detailed configuration, training semantics, API examples, and EC2 operating inst
 - [Serving and prediction logs](#serve)
 - [Drift monitoring](#drift-monitoring)
 - [Daily EC2 jobs](#daily-scoring-and-drift-checks-on-ec2)
+- [Streamlit dashboard](#streamlit-dashboard)
 - [Repository layout](#layout)
 
 ## Setup
@@ -357,6 +358,39 @@ jobs. Check the log for the scoring upload confirmation and drift verdicts, then
 confirm the dated artifacts in S3. A `DRIFT` verdict is a monitoring result, not
 a process failure. These checks describe how to verify execution; the presence
 of cron entries alone does not confirm that a particular run succeeded.
+
+## Streamlit dashboard
+
+Run `uv run streamlit run streamlit_app.py` from this repository after
+`uv sync --locked`. The root `.env` supplies `S3_BUCKET`, `AWS_DEFAULT_REGION`,
+and optional AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and
+`AWS_SESSION_TOKEN` for temporary credentials). Alternatively use `AWS_PROFILE`
+or the standard AWS credential chain. Process environment values override `.env`.
+No external checkout or external `.env` is required. The server binds to localhost.
+
+The app only lists and reads S3 objects. Grant `s3:ListBucket` on the bucket and
+`s3:GetObject` for `predictions/*` and `monitoring/*`. Credentials are not displayed.
+Reads are cached for five minutes; **Refresh from S3** clears the cache.
+
+- Prediction CSVs must contain `conversion_probability` (or `conv_prob`) with numeric values from 0 to 1. The app computes cancellation risk as one minus that probability and ranks least likely to convert first.
+- Drift JSON must contain boolean `drift` and numeric `drifted_share` from 0 to 1. The stored verdict is authoritative.
+- Artifact dates come from `YYYY-MM-DD` in filenames, not upload dates. Predictions and drift each use their latest available date; mismatched dates are flagged.
+- Measured reports take precedence over reports explicitly marked `source: backfill` on the same day. Synthetic backfill is labeled in history.
+- Missing days remain gaps. Invalid or unreadable artifacts are reported as unavailable rather than healthy. Prediction charts show estimated probabilities, not observed conversion rates.
+
+The default history window covers 31 calendar days ending at the latest artifact;
+a calendar-month selector is also available. Country/device filters and an
+outreach cutoff apply to the latest ranked list, preserving original ranks.
+Filtered rankings and daily history can be downloaded as CSVs.
+
+Run the isolated data tests without S3 credentials or a model:
+
+```bash
+uv run pytest tests/test_dashboard.py -q
+```
+
+The dashboard runs separately from the API. The current EC2 deployment continues
+to deploy the API and scheduled jobs; it does not host the Streamlit interface.
 
 ## Layout
 

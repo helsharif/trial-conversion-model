@@ -12,7 +12,7 @@ Built by **Husayn El Sharif** as part of the **FutureProof DS Cohort 2026**. The
 | Delivery | FastAPI for individual predictions; batch CSVs in Amazon S3 |
 | Deployment | Docker images published to GHCR and deployed to AWS EC2 through GitHub Actions |
 | Monitoring | Daily Evidently drift checks, S3 reports, and Slack webhook alerts |
-| Companion dashboard | Streamlit view of ranked trials, latest drift verdict, and monthly history in a [separate repository](https://github.com/helsharif/beam-trial-conversion-prediction#streamlit-s3-dashboard) |
+| Dashboard | [Streamlit app](streamlit_app.py) in this repository: ranked trials, latest drift verdict, and monthly history |
 
 The core workflow is implemented. This is a deployed learning and portfolio project; its measured model results and operational capabilities are described below without claiming a demonstrated increase in paid conversions.
 
@@ -53,7 +53,7 @@ flowchart TD
     K[Training reference snapshot] --> I
     I --> L[Ranked CSVs and drift reports in S3]
     I --> M[Slack alert on newest-cohort drift]
-    L --> N[Companion Streamlit dashboard]
+    L --> N[Streamlit dashboard]
 ```
 
 Training, serving, and monitoring have separate responsibilities. Training publishes model artifacts; the API and scoring job load a model packaged in their images. Drift checks compare incoming features with the training reference and do not require model predictions. Cron schedules the jobs; the dashboard reads their saved outputs.
@@ -149,7 +149,7 @@ Bands are **low** below `0.33`, **medium** from `0.33` to below `0.66`, and **hi
 
 The batch job produces `predictions/scored_YYYY-MM-DD.csv` in S3, sorted by ascending `conversion_probability`. It includes the original cohort fields, probability, and conversion band.
 
-The [companion Streamlit dashboard](https://github.com/helsharif/beam-trial-conversion-prediction#streamlit-s3-dashboard) displays the latest ranking and drift verdict, filters outreach candidates, and shows a 31-day or calendar-month history with CSV downloads. It labels synthetic backfilled drift reports and prefers measured reports on overlapping dates. Its source and launch instructions are in that separate repository, not this checkout.
+The [Streamlit dashboard](streamlit_app.py) displays the latest ranking and drift verdict, filters outreach candidates, and shows a 31-day or calendar-month history with CSV downloads. It labels synthetic backfilled drift reports and prefers measured reports on overlapping dates. It reads this repository's `.env` and uses read-only S3 access. Launch instructions are below.
 
 ## Daily automation and monitoring
 
@@ -245,6 +245,32 @@ uv run uvicorn trial_conversion_model.api.main:app --reload
 
 Open [interactive API docs](http://127.0.0.1:8000/docs) to submit the example request. Docker commands, batch scoring behavior, and manual drift checks are documented in the [operations reference](docs/operations.md).
 
+### 4. Open the Streamlit dashboard
+
+The dashboard is included in this repository. After `uv sync --locked`, run:
+
+```bash
+uv run streamlit run streamlit_app.py
+```
+
+Open [the dashboard](http://localhost:8501). If that port is occupied, add
+`--server.port 8502` and open [port 8502](http://localhost:8502). Press **Ctrl+C**
+in the terminal to stop it.
+
+It reads `S3_BUCKET` and AWS settings from the root `.env`, with environment
+variables taking precedence. It also supports AWS profiles and IAM roles. The
+AWS identity needs `s3:ListBucket` and `s3:GetObject` access to prediction and
+monitoring artifacts. The dashboard does not require a local model, database,
+MLflow server, or running API. Streamlit is included in the default development
+dependencies installed by `uv sync`.
+
+Use **Refresh from S3** to bypass the five-minute cache. Rankings place the
+lowest conversion probabilities first; filters cover country, device, and an
+adjustable outreach cutoff. History defaults to 31 days ending at the newest
+artifact date, with a calendar-month option. Both views support CSV download.
+See [dashboard behavior and validation](docs/operations.md#streamlit-dashboard)
+for artifact formats and missing-data handling.
+
 ## Repository guide
 
 | Location | Responsibility |
@@ -252,7 +278,9 @@ Open [interactive API docs](http://127.0.0.1:8000/docs) to submit the example re
 | [src/trial_conversion_model/](src/trial_conversion_model/) | Data access, feature engineering, training, prediction, cohort retrieval, and monitoring |
 | [src/trial_conversion_model/api/](src/trial_conversion_model/api/) | FastAPI application, routes, and request/response schemas |
 | [scripts/](scripts/) | Command-line entry points, including training, daily scoring, drift checks, and synthetic history backfill |
-| [tests/](tests/) | Feature, API, and model promotion tests |
+| [tests/](tests/) | Feature, API, model promotion, and dashboard tests |
+| [streamlit_app.py](streamlit_app.py) | Dashboard interface, filters, history charts, and CSV downloads |
+| [dashboard_data.py](src/trial_conversion_model/dashboard_data.py) | S3 artifact loading, validation, ranking, and report selection |
 | [Dockerfile](Dockerfile) / [Dockerfile.jobs](Dockerfile.jobs) | Separate service and scheduled-job images |
 | [.github/workflows/ci.yml](.github/workflows/ci.yml) | Test, image publication, and EC2 deployment pipeline |
 | [notebooks/](notebooks/) | Exploratory analysis |
