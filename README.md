@@ -176,6 +176,10 @@ Bands are **low** below `0.33`, **medium** from `0.33` to below `0.66`, and **hi
 
 The batch job produces `predictions/scored_YYYY-MM-DD.csv` in S3, sorted by ascending `conversion_probability`. It includes the original cohort fields, probability, and conversion band.
 
+![Sorted scored output showing the first, middle, and last 10 rows](assets/trial-conversion-scored-output-first-middle-last-10.png)
+
+*Scored output for October 17, 2026: 120 trials sorted by ascending conversion probability. The preview shows ranks 1–10, 56–65, and 111–120. All 12 CSV fields are retained, with probability and band placed first for readability; rank is added for orientation. Probabilities use the original 0–1 scale. Lower scores receive higher outreach priority; these are predictions, not observed conversion outcomes. Open the image for full-size detail.*
+
 The [Streamlit dashboard](streamlit_app.py) displays the latest ranking and drift verdict, filters outreach candidates, and shows a 31-day or calendar-month history with CSV downloads. It labels synthetic backfilled drift reports and prefers measured reports on overlapping dates. It reads this repository's `.env` and uses read-only S3 access. Launch instructions are below.
 
 ![Streamlit outreach dashboard showing conversion rankings, an adjustable cutoff, country and device filters, freshness warnings, and drift status](assets/screenshot-app-ui-results-001.png)
