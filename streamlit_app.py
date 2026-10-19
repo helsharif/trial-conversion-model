@@ -37,19 +37,39 @@ def verdict(bucket, artifact, _client):
 
 
 def main():
-    st.caption('BEAM / GROWTH INTELLIGENCE')
+    st.caption('BEAM / MACHINE LEARNING PORTFOLIO DEMO')
     st.title('Trial conversion monitor')
-    st.write('Find trials that may need support, then review how the scored population changes over time.')
-    with st.sidebar:
-        st.header('Data connection')
-        if st.button('Refresh from S3', type='primary', width='stretch'):
-            inventory.clear()
-            scores.clear()
-            verdict.clear()
-        st.caption('S3 reads are cached for 5 minutes. Refresh checks for new artifacts immediately.')
+    st.write(
+        'Which free-trial users may need help becoming paid subscribers? '
+        'This dashboard presents model predictions and monitoring results for Beam, '
+        'a fictional subscription-based digital content platform used in this portfolio project.'
+    )
+    with st.container(border=True):
+        st.markdown('**The data**')
+        st.write(
+            'This demo uses synthetic trial and engagement data, not real customer records. '
+            'Each row in the ranked list represents one user’s trial. The model uses the first '
+            'three days of activity—session counts, listening sessions, time spent, country, '
+            'and device type—to estimate whether a 14-day free trial will convert to a paid subscription. '
+            'Historical training records include the outcome: converted (1) or did not convert (0).'
+        )
+        st.markdown('**The purpose**')
+        st.write(
+            'Scoring on day 3 leaves 11 days for a growth team to offer onboarding support. '
+            'The Outreach view puts trials least likely to convert first; use the outreach '
+            'cutoff and country/device filters to explore potential candidates. The History view '
+            'shows scoring volume, predicted conversion, and data drift—changes in the input '
+            'population compared with reference data.'
+        )
+        st.caption(
+            'An ML/MLOps demonstration: data preparation, model training, batch scoring, and monitoring. '
+            'This dashboard displays saved results; it does not train models or run drift checks. '
+            'Probabilities are predictions, not observed conversion rates or proof that outreach works. '
+            'History labeled Synthetic backfill contains illustrative drift verdicts, not measured checks.'
+        )
     try:
         bucket, client = connect()
-        with st.spinner('Reading S3 artifacts…'):
+        with st.spinner('Loading demo results…'):
             predictions, reports = inventory(bucket, client)
     except ValueError as exc:
         st.error(str(exc))
@@ -57,7 +77,6 @@ def main():
     except (BotoCoreError, ClientError):
         st.error('Cannot read S3. Check AWS credentials, region, and s3:ListBucket / s3:GetObject permissions.')
         st.stop()
-    st.sidebar.caption(f'Source: s3://{bucket}')
     if not predictions and not reports:
         st.info('No dated prediction CSVs or monitoring JSON reports were found.')
         return
@@ -73,7 +92,7 @@ def main():
                 month = st.selectbox('Month', months, width=200)
                 start = date.fromisoformat(month + '-01')
                 stop = (start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
-    with st.sidebar.expander('How to read this dashboard'):
+    with st.expander('How to read this dashboard'):
         st.write('Scores estimate conversion; they are not observed outcomes. Rank 1 is the trial '
                  'with the lowest predicted conversion probability. Use the list to review outreach '
                  'opportunities, not as evidence that outreach will change an outcome.')
@@ -131,7 +150,7 @@ def main():
 
     if page == 'Outreach':
         if frame is None:
-            st.info('Latest predictions are unavailable. Refresh the data connection or check the Data sources.')
+            st.info('Latest predictions are unavailable. Please try again later.')
         else:
             st.subheader('Outreach list')
             st.caption('Lowest conversion probability first. Filter the cohort, then export the rows you want to review.')
