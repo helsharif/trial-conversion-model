@@ -2,7 +2,11 @@
 
 **An end-to-end machine learning project that turns early trial activity into daily outreach priorities, with an API, automated deployment, and drift monitoring.**
 
-Built by **Husayn El Sharif** as part of the **FutureProof DS Cohort 2026**. The model predicts whether a 14-day trial will convert to a paid subscription using only the first three days of activity, leaving the growth team approximately 11 days to act.
+Built by **Husayn El Sharif**. The project models a subscription-based digital content platform using **synthetic user engagement and trial-conversion data**. Users explore the service during a **14-day trial**, then choose whether to become paying subscribers or abandon the service. Scoring after the first three days gives a growth team approximately **11 days to offer support before the trial expires**.
+
+The workflow demonstrates skills that transfer to similar subscription services: feature engineering, model evaluation, experiment tracking, API and batch delivery, automated cloud deployment, and monitoring.
+
+![Trial conversion workflow: observe engagement during days 1–3, predict conversion at day 3, and prioritize support during days 4–14](assets/beam-trial-conversion-infographic.png)
 
 | At a glance | Implementation |
 | --- | --- |
@@ -19,6 +23,7 @@ The core workflow is implemented. This is a deployed learning and portfolio proj
 ## Contents
 
 - [Business problem](#business-problem)
+- [Lessons for similar subscription services](#lessons-for-similar-subscription-services)
 - [How the system works](#how-the-system-works)
 - [Data, features, and model results](#data-features-and-model-results)
 - [Training and model promotion](#training-and-model-promotion)
@@ -31,11 +36,27 @@ The core workflow is implemented. This is a deployed learning and portfolio proj
 
 ## Business problem
 
-Growth teams have limited capacity to contact trial users. A ranked list helps them prioritize users who appear unlikely to convert while there is still time for onboarding support or engagement prompts.
+The business setting is a digital content service where users engage through sessions, including listening sessions. During a 14-day trial, some users return regularly and spend more time exploring content, while others use the service briefly or stop returning. The synthetic data captures those engagement patterns and the eventual paid-conversion outcome.
+
+Growth teams have limited capacity to contact trial users. A ranked list helps them prioritize users who appear unlikely to convert while there is still time for onboarding support or engagement prompts. By scoring at the end of day 3, the system supports outreach during days 4–14, before users decide whether to pay for continued access or leave.
+
+For each new trial user, the model receives session counts for days 1, 2, and 3; listening-session counts and total engagement minutes across those days; country; and device type. Those inputs become features describing activity volume, consistency, and depth. The eventual conversion outcome is a training label, not a prediction input.
 
 The prediction target is `converted`: **1** means the trial became a paid subscription and **0** means it did not. The system scores at day 3 using activity available at that point. Lower predicted conversion probability means higher priority in the outreach list.
 
 A prediction estimates conversion likelihood; it does not estimate whether an intervention will work. Establishing business impact would require a controlled outreach experiment.
+
+## Lessons for similar subscription services
+
+This project demonstrates an adaptable workflow for digital content, SaaS, and membership services that offer trials:
+
+- **Make predictions actionable:** choose an observation window early enough to leave time for onboarding or engagement support.
+- **Keep features consistent:** reuse transformations across training, API predictions, batch scoring, and monitoring to reduce discrepancies.
+- **Separate model selection from delivery:** track experiments and promotion decisions, then package and deploy the selected model through a repeatable pipeline.
+- **Put operational context next to predictions:** show data freshness and drift alongside outreach rankings so teams can judge whether outputs need investigation.
+- **Validate business value separately:** adapt features, trial windows, and outreach capacity to the service, evaluate on later cohorts, and test whether outreach produces incremental conversions.
+
+The recorded evaluation demonstrates performance on this synthetic dataset. Applying the workflow to another service requires evaluation and calibration on that service's data; the reported AUC is not a forecast of results elsewhere.
 
 ## How the system works
 
@@ -64,7 +85,9 @@ The diagram shows the conditional promotion path. The original training command 
 
 ### Data and features
 
-Training starts from a local CSV extract of PostgreSQL view `ml.trial_snapshot_latest`. Keeping the extract fixed allows experiments to use the same input data. Scheduled jobs download dated day-3 cohorts from the public `fpds-trial-cohorts` S3 bucket.
+The engagement and conversion records are synthetic. Training starts from a local CSV extract of PostgreSQL view `ml.trial_snapshot_latest`. Keeping the extract fixed allows experiments to use the same input data. Scheduled jobs download dated day-3 cohorts from the public `fpds-trial-cohorts` S3 bucket.
+
+Raw prediction inputs are `sessions_day1`, `sessions_day2`, `sessions_day3`, `listen_sessions_3d`, `total_minutes_3d`, `country`, and `device_type`. The shared feature function derives the following inputs using only the first three days:
 
 | Feature group | Model inputs | What they describe |
 | --- | --- | --- |
@@ -151,6 +174,10 @@ The batch job produces `predictions/scored_YYYY-MM-DD.csv` in S3, sorted by asce
 
 The [Streamlit dashboard](streamlit_app.py) displays the latest ranking and drift verdict, filters outreach candidates, and shows a 31-day or calendar-month history with CSV downloads. It labels synthetic backfilled drift reports and prefers measured reports on overlapping dates. It reads this repository's `.env` and uses read-only S3 access. Launch instructions are below.
 
+![Streamlit outreach dashboard showing conversion rankings, an adjustable cutoff, country and device filters, freshness warnings, and drift status](assets/screenshot-app-ui-results-001.png)
+
+*Dashboard snapshot: lower predicted conversion probabilities appear first. The displayed counts, scores, and warnings describe the captured cohort, not a live feed.*
+
 ## Daily automation and monitoring
 
 The EC2 host uses two cron entries with the image `ghcr.io/helsharif/trial-conversion-model-jobs:latest`:
@@ -163,6 +190,10 @@ The EC2 host uses two cron entries with the image `ghcr.io/helsharif/trial-conve
 Times follow the **EC2 cron timezone**, not necessarily the reader's local timezone. The two jobs run independently; the 15-minute gap is not a dependency check. The [EC2 runbook](docs/operations.md#daily-scoring-and-drift-checks-on-ec2) retains both exact cron commands, host setup requirements, and log inspection commands.
 
 Evidently compares the eight feature distributions with the training reference. **Dataset drift is flagged when at least 50% of features drift**—four of the current eight. The fraction describes features, not users. Drift is an investigation signal; model performance can only be confirmed once conversion labels arrive.
+
+![Evidently drift report showing three of eight features drifting, below the dataset-level threshold of 50 percent](assets/drift-detection-report-evidently.png)
+
+*Example monitoring snapshot: three of eight features drifted (37.5%), below the 50% dataset-level threshold. This report and the dashboard screenshot show separate snapshots, so their drift verdicts differ. The percentage refers to features, not users.*
 
 | Artifact | Location |
 | --- | --- |
