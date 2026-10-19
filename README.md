@@ -87,6 +87,10 @@ The diagram shows the conditional promotion path. The original training command 
 
 The engagement and conversion records are synthetic. Training starts from a local CSV extract of PostgreSQL view `ml.trial_snapshot_latest`. Keeping the extract fixed allows experiments to use the same input data. Scheduled jobs download dated day-3 cohorts from the public `fpds-trial-cohorts` S3 bucket.
 
+![Training dataframe preview showing all 12 columns for the first 30 and last 30 rows](assets/trial-conversion-training-data-first-last-30.png)
+
+*Raw training snapshot: 1,516 rows and 12 columns. The preview preserves the CSV order and zero-based dataframe index, showing `df.head(30)` and `df.tail(30)` with 1,456 middle rows omitted. IDs, dates, and the `converted` label provide context; they are not all model inputs. Open the image for full-size detail.*
+
 Raw prediction inputs are `sessions_day1`, `sessions_day2`, `sessions_day3`, `listen_sessions_3d`, `total_minutes_3d`, `country`, and `device_type`. The shared feature function derives the following inputs using only the first three days:
 
 | Feature group | Model inputs | What they describe |
