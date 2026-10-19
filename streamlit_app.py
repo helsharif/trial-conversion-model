@@ -1,6 +1,7 @@
 """Run with: uv run streamlit run streamlit_app.py"""
 
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -37,36 +38,52 @@ def verdict(bucket, artifact, _client):
 
 
 def main():
-    st.caption('BEAM / MACHINE LEARNING PORTFOLIO DEMO')
-    st.title('Trial conversion monitor')
-    st.write(
-        'Which free-trial users may need help becoming paid subscribers? '
-        'This dashboard presents model predictions and monitoring results for Beam, '
-        'a fictional subscription-based digital content platform used in this portfolio project.'
-    )
-    with st.container(border=True):
-        st.markdown('**The data**')
+    graphic, introduction = st.columns([1, 3], gap='large', vertical_alignment='top')
+    with graphic:
+        st.image(
+            str(Path(__file__).resolve().parent / 'assets' / 'beam-trial-conversion-infographic.png'),
+            width=650,
+            alt='Beam trial conversion workflow: observe early engagement, predict conversion, prioritize outreach, and monitor drift.',
+        )
+    with introduction:
+        st.caption('BEAM / MACHINE LEARNING PORTFOLIO DEMO')
+        st.title('Trial conversion monitor')
         st.write(
-            'This demo uses synthetic trial and engagement data, not real customer records. '
-            'Each row in the ranked list represents one user’s trial. The model uses the first '
-            'three days of activity—session counts, listening sessions, time spent, country, '
-            'and device type—to estimate whether a 14-day free trial will convert to a paid subscription. '
-            'Historical training records include the outcome: converted (1) or did not convert (0).'
+            'This portfolio project tackles early trial conversion prediction for Beam, a subscription '
+            'media app used in a simulated B2B SaaS training scenario. In the business case, roughly '
+            '250 users begin a 14-day free trial each week, but only about half convert to a paid plan, '
+            'below the 58% planning assumption. Trials convert automatically unless users cancel. '
+            'Instead of waiting until a trial ends, the growth team needs to identify users who may '
+            'cancel while there is still time to help. The model uses the first three days of activity '
+            'to predict paid conversion by day 14; this dashboard turns those scores into a ranked '
+            'outreach list and tracks changes in the trial population.'
         )
-        st.markdown('**The purpose**')
-        st.write(
-            'Scoring on day 3 leaves 11 days for a growth team to offer onboarding support. '
-            'The Outreach view puts trials least likely to convert first; use the outreach '
-            'cutoff and country/device filters to explore potential candidates. The History view '
-            'shows scoring volume, predicted conversion, and data drift—changes in the input '
-            'population compared with reference data.'
-        )
-        st.caption(
-            'An ML/MLOps demonstration: data preparation, model training, batch scoring, and monitoring. '
-            'This dashboard displays saved results; it does not train models or run drift checks. '
-            'Probabilities are predictions, not observed conversion rates or proof that outreach works. '
-            'History labeled Synthetic backfill contains illustrative drift verdicts, not measured checks.'
-        )
+        with st.container(border=True):
+            st.markdown('**The data**')
+            st.write(
+                'This demo uses synthetic trial and engagement data, not real customer records. '
+                'Each row in the ranked list represents one user’s trial. The model uses the first '
+                'three days of activity—session counts, listening sessions, time spent, country, '
+                'and device type—to estimate whether a 14-day free trial will convert to a paid subscription. '
+                'Historical training records include the outcome: converted (1) or did not convert (0). '
+                'Training data and daily scoring cohorts come from the same synthetic generator, '
+                'designed to mimic realistic trial behavior. The course deliberately shifts later '
+                'signups toward lower-intent users to demonstrate data drift.'
+            )
+            st.markdown('**The purpose**')
+            st.write(
+                'Scoring on day 3 leaves 11 days for a growth team to offer onboarding support. '
+                'The Outreach view puts trials least likely to convert first; use the outreach '
+                'cutoff and country/device filters to explore potential candidates. The History view '
+                'shows scoring volume, predicted conversion, and data drift—changes in the input '
+                'population compared with reference data.'
+            )
+            st.caption(
+                'An ML/MLOps demonstration: data preparation, model training, batch scoring, and monitoring. '
+                'This dashboard displays saved results; it does not train models or run drift checks. '
+                'Probabilities are predictions, not observed conversion rates or proof that outreach works. '
+                'History labeled Synthetic backfill contains illustrative drift verdicts, not measured checks.'
+            )
     try:
         bucket, client = connect()
         with st.spinner('Loading demo results…'):
