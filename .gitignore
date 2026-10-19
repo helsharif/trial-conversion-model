@@ -36,3 +36,6 @@ monitoring/
 
 # ignore specific folder for env files in ec2
 ec2_folder/
+
+# ignore notes/ folder
+notes/
