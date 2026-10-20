@@ -3851,6 +3851,7 @@ dependencies = [
     { name = "requests" },
     { name = "scikit-learn" },
     { name = "sqlalchemy" },
+    { name = "streamlit" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "xgboost" },
 ]
@@ -3878,6 +3879,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.34.2" },
     { name = "scikit-learn", specifier = ">=1.9.0" },
     { name = "sqlalchemy", specifier = ">=2.0.51" },
+    { name = "streamlit", specifier = "==1.66.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.1" },
     { name = "xgboost", specifier = ">=3.2.0" },
 ]

@@ -39,3 +39,6 @@ ec2_folder/
 
 # ignore notes/ folder
 notes/
+
+# streamlit secrets ignore
+.streamlit/secrets.toml
