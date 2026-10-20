@@ -2,6 +2,8 @@
 
 **An end-to-end machine learning project that turns early trial activity into daily outreach priorities, with an API, automated deployment, and drift monitoring.**
 
+**[Try the live Streamlit demo](https://trial-conversion-model.streamlit.app/)** — explore ranked trial predictions, outreach filters, and drift-monitoring history using synthetic data.
+
 Built by **Husayn El Sharif**. The project models a subscription-based digital content platform using **synthetic user engagement and trial-conversion data**. Users explore the service during a **14-day trial**, then choose whether to become paying subscribers or abandon the service. Scoring after the first three days gives a growth team approximately **11 days to offer support before the trial expires**.
 
 The workflow demonstrates skills that transfer to similar subscription services: feature engineering, model evaluation, experiment tracking, API and batch delivery, automated cloud deployment, and monitoring.
@@ -16,7 +18,7 @@ The workflow demonstrates skills that transfer to similar subscription services:
 | Delivery | FastAPI for individual predictions; batch CSVs in Amazon S3 |
 | Deployment | Docker images published to GHCR and deployed to AWS EC2 through GitHub Actions |
 | Monitoring | Daily Evidently drift checks, S3 reports, and Slack webhook alerts |
-| Dashboard | [Streamlit app](streamlit_app.py) in this repository: ranked trials, latest drift verdict, and monthly history |
+| Dashboard | [Live demo](https://trial-conversion-model.streamlit.app/) · [Source code](streamlit_app.py): ranked trials, latest drift verdict, and monthly history |
 
 The core workflow is implemented. This is a deployed learning and portfolio project; its measured model results and operational capabilities are described below without claiming a demonstrated increase in paid conversions.
 
